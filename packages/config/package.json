@@ -1,0 +1,39 @@
+{
+  "name": "@vastworld/config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "共享的 ESLint / Prettier / Vitest 工程配置，供 workspace 内各包复用",
+  "type": "module",
+  "exports": {
+    "./eslint": "./eslint.config.mjs",
+    "./prettier": "./prettier.config.mjs",
+    "./vitest": "./vitest.config.ts",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "eslint.config.mjs",
+    "prettier.config.mjs",
+    "vitest.config.ts"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "build": "tsc --noEmit -p tsconfig.json",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "eslint-config-prettier": "^10.1.8",
+    "typescript-eslint": "^8.66.0"
+  },
+  "peerDependencies": {
+    "eslint": ">=9",
+    "prettier": ">=3",
+    "typescript": ">=5 <7",
+    "vitest": ">=3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "vastworld",
+  "version": "0.0.0",
+  "private": true,
+  "description": "VastWorld M0 工程基线：pnpm workspace + 统一 lint/typecheck/test/build",
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r run typecheck",
+    "test": "vitest run",
+    "build": "pnpm -r run build",
+    "dev": "pnpm --parallel -r run dev",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@vastworld/config": "workspace:*",
+    "eslint": "^10.8.0",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

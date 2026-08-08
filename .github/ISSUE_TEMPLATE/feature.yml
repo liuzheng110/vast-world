@@ -1,0 +1,56 @@
+name: 玩法或功能提案
+description: 提出可验证、可关闭的小型玩法或工程功能
+title: "[Feature]: "
+labels:
+  - proposal
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提案不是自动进入开发的承诺。请先确认所属路线阶段和服务端权威边界。
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: 路线阶段
+      options:
+        - M0 工程基线
+        - M1 多人垂直切片
+        - M2 最小 PVE
+        - M3 内容管线
+        - M4 邀请 Beta
+        - V1.0 或更远
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决的问题
+      description: 描述玩家或开发者现在遇到的问题，不要只写解决方案名称。
+    validations:
+      required: true
+  - type: textarea
+    id: loop
+    attributes:
+      label: 对核心循环的影响
+      description: 玩家输入、服务端判定和可见反馈分别是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: 范围与明确不做
+    validations:
+      required: true
+  - type: textarea
+    id: risk
+    attributes:
+      label: 协议、数据、安全、性能和素材影响
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 可观察验收条件
+      description: 给出测试、人工验证、关闭和回滚方法。
+    validations:
+      required: true

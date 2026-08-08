@@ -1,0 +1,40 @@
+name: Bug 报告
+description: 报告可复现且不包含敏感利用细节的问题
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        安全漏洞不要公开提交，请按 SECURITY.md 私下报告。
+  - type: textarea
+    id: observed
+    attributes:
+      label: 实际现象
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期现象
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 最小复现步骤
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境
+      description: 游戏版本/commit、浏览器、操作系统、房间人数和网络情况。
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 日志或画面
+      description: 请先删除 token、邮箱、玩家 ID 等敏感数据。
