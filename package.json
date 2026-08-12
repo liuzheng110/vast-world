@@ -23,13 +23,13 @@
     "test:e2e": "playwright test --config tests/e2e/playwright.config.ts"
   },
   "devDependencies": {
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.2.0",
     "@electric-sql/pglite": "0.5.4",
     "@vastworld/config": "workspace:*",
     "@playwright/test": "^1.62.1",
-    "eslint": "^10.8.0",
+    "eslint": "^10.8.1",
     "prettier": "^3.9.6",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   }
 }

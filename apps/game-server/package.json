@@ -23,22 +23,22 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
-    "@colyseus/core": "^0.16.0",
-    "@colyseus/monitor": "^0.16.0",
-    "@colyseus/ws-transport": "^0.16.0",
+    "@colyseus/core": "^0.18.3",
+    "@colyseus/monitor": "^0.17.8",
+    "@colyseus/ws-transport": "^0.17.13",
     "@vastworld/game-core": "workspace:*",
     "@vastworld/protocol": "workspace:*",
     "express": "^5.1.0",
-    "ws": "^8.21.2"
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.2.0",
     "@types/ws": "^8.18.1",
     "@vastworld/config": "workspace:*",
-    "esbuild": "^0.28.1",
-    "tsx": "^4.20.0",
-    "typescript": "^5.9.3",
+    "esbuild": "^0.28.2",
+    "tsx": "^4.23.11",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   }
 }
