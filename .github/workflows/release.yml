@@ -1,0 +1,110 @@
+name: Release Artifacts
+
+# 复用工作流：由 release-please.yml 在 releases_created=true 后调用。
+# 构建 Web 静态产物与 game-server 可分发包，生成校验和与版本信息，
+# 并上传到 release-please 已创建的 GitHub Release（gh release upload，绝不再次 create）。
+#
+# 当前明确禁止：Docker 构建、GHCR 推送、容器部署（按本阶段策略）。
+on:
+  workflow_call:
+    inputs:
+      tag_name:
+        description: "Release git tag (e.g. v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build-artifacts:
+    name: build-artifacts
+    runs-on: ubuntu-latest
+    # 上传制品到已存在的 Release 需要写 contents。
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node (pinned)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web
+        run: pnpm --filter @vastworld/web build
+
+      - name: Build game-server (esbuild → dist/main.js, 独立可部署)
+        # game-server 的 build 产出 dist/main.js（内联 @vastworld/* workspace 源码）+
+        # dist/package.json（只声明注册表运行时依赖）+ dist/README.md。
+        # 注意：@colyseus/core@0.16.25 的 package.json 在 registry 上仍带 `workspace:^` 协议
+        # （上游 bug），npm install 会失败。因此这里用 pnpm 安装生产依赖，
+        # 再把 node_modules 一起打包进 tarball，下载者解压后直接 `node main.js` 即可运行。
+        run: pnpm --filter @vastworld/game-server build
+
+      - name: Install game-server production deps (pnpm, 避开 npm workspace: 协议 bug)
+        # @colyseus/core@0.16.25 发布时保留了 `workspace:^`，npm 无法解析。
+        # 在 dist/ 里用 pnpm 独立安装（ignore-workspace 脱离 monorepo，hoisted 产出扁平 node_modules）。
+        # msgpackr-extract 的可选 native build 脚本被忽略不影响核心功能。
+        env:
+          CI: true
+        run: |
+          cd apps/game-server/dist
+          pnpm install --prod \
+            --config.ignore-workspace=true \
+            --config.node-linker=hoisted
+        continue-on-error: false
+
+      - name: Verify game-server dist runs
+        # 在打包前验证 dist 可独立运行（不依赖 monorepo）
+        run: |
+          set -euo pipefail
+          cd apps/game-server/dist
+          GAME_SERVER_PORT=25699 HEALTH_SERVER_PORT=25799 timeout 5 node main.js &
+          SRV_PID=$!
+          sleep 2
+          curl -sf http://127.0.0.1:25799/health/ready | grep -q ready
+          kill $SRV_PID 2>/dev/null || true
+
+      - name: Pack web-dist.tar.gz
+        run: tar czf web-dist.tar.gz -C apps/web dist
+
+      - name: Pack game-server-dist.tar.gz (构建产物 + 生产依赖)
+        # 打包 dist/ 产物 + node_modules/ —— 下载者解压后直接 `node main.js` 即可运行，
+        # 不需要 npm install / pnpm install / tsx / monorepo 布局。
+        # @colyseus/core@0.16.25 的 `workspace:^` 协议导致 npm install 失败，
+        # 因此把 pnpm 安装好的 node_modules 一起打包是最可靠的方案。
+        run: |
+          set -euo pipefail
+          tar czf game-server-dist.tar.gz -C apps/game-server dist
+
+      - name: Generate version.json (version / commit / protocol)
+        env:
+          TAG: ${{ inputs.tag_name }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          node -e "const fs=require('fs');const s=fs.readFileSync('packages/protocol/src/version.ts','utf8');const m=s.match(/PROTOCOL_VERSION\s*=\s*(\d+)/);const proto=m?Number(m[1]):null;const tag=process.env.TAG;fs.writeFileSync('version.json',JSON.stringify({tag:tag,version:tag.replace(/^v/,''),commitSha:process.env.COMMIT,protocolVersion:proto,generatedAt:new Date().toISOString()},null,2)+'\n')"
+          echo "version.json:"; cat version.json
+
+      - name: Generate checksums.txt
+        run: sha256sum web-dist.tar.gz game-server-dist.tar.gz version.json > checksums.txt
+
+      - name: Upload artifacts to existing GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release upload "${{ inputs.tag_name }}" \
+            web-dist.tar.gz game-server-dist.tar.gz checksums.txt version.json \
+            --clobber

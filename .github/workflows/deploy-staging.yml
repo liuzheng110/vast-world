@@ -1,0 +1,28 @@
+name: Deploy Staging (disabled placeholder)
+
+# RELEASE.md §4 deploy-staging.yml — 当前 M0 阶段：
+# 明确禁止 Docker 构建、GHCR 推送与容器部署。本工作流仅作为 workflow_dispatch 手动占位，
+# 不在 main 推送后运行，也不假装部署成功。
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment name"
+        required: false
+        default: "staging"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  placeholder:
+    name: staging-placeholder
+    runs-on: ubuntu-latest
+    steps:
+      - name: Staging deployment disabled (manual placeholder)
+        run: |
+          echo "::notice::Staging deployment is DISABLED for M0."
+          echo "::notice::Docker builds and GHCR pushes are prohibited by current policy."
+          echo "::notice::This workflow is a manual placeholder (workflow_dispatch) only — no deployment performed."
+          echo "done"

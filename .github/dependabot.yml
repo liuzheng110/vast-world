@@ -1,0 +1,30 @@
+# Dependabot — VastWorld M0
+# 依据 RELEASE.md §3.1：npm/pnpm 每周分组；GitHub Actions 每月。
+# 不配置 open-pull-requests-limit 自动合并：CI 与人工抽查后由维护者合并；
+# major 升级不自动合并（本仓库不提供任何 auto-merge 工作流）。
+version: 2
+
+updates:
+  # pnpm / npm 依赖（pnpm 锁文件由 Dependabot 的 npm ecosystem 处理）
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 20
+    groups:
+      all-dependencies:
+        patterns:
+          - "*"
+    # 升级 Phaser / Colyseus / Supabase / 数据库驱动 / 构建工具 时需要运行集成与 E2E，
+    # 这些由 CI 自动校验，major 升级默认不会自动合并（本仓库不提供任何 auto-merge 工作流）。
+
+  # GitHub Actions 自身依赖，每月一次
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 10
+    groups:
+      all-actions:
+        patterns:
+          - "*"

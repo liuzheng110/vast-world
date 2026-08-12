@@ -1,0 +1,184 @@
+name: CI
+
+# RELEASE.md §4 ci.yml — 每个 PR（及 main 推送）运行完整校验。
+# 第三方 Action 均固定到完整 commit SHA（见下方 pin）。
+#
+# 强制门禁：apps/web / Playwright / E2E 若存在则必须真正运行并通过；
+# 缺失时报错退出（不 warning 后 0）。migration-check 真实运行 `pnpm db:test`（PGlite），
+# 而非仅检查文件名。
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+# 取消同分支过期运行，避免浪费资源。
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# 默认最小权限；各 job 仅增加所需权限。
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Setup Node (pinned)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Enable corepack (pnpm from packageManager field)
+        run: corepack enable
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests (all workspaces)
+        # 根 vitest.config.ts 只包含 packages/**/*.test.ts，会漏掉 apps/ 下的测试。
+        # 改用 `pnpm -r run test` 让每个 workspace 各自跑自己的 vitest，覆盖全部 73 个测试。
+        run: pnpm -r run test
+
+      - name: Build (all workspaces with a build script)
+        run: pnpm build
+
+      - name: Contract schema check (protocol + game-core)
+        run: |
+          pnpm --filter @vastworld/protocol run typecheck
+          pnpm --filter @vastworld/game-core run typecheck
+
+  migration-check:
+    name: migration-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Setup Node (pinned)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Migration + RLS + constraint checks (PGlite, real run)
+        # 真实执行迁移、重复幂等、seed、RLS 与约束用例，而非仅检查文件名。
+        run: pnpm db:test
+
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Setup Node (pinned)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Server integration smoke (health + version handshake)
+        run: |
+          set -euo pipefail
+          export GAME_SERVER_PORT=25670
+          export HEALTH_SERVER_PORT=25700
+          pnpm --filter @vastworld/game-server start &
+          SRV_PID=$!
+          trap 'kill $SRV_PID 2>/dev/null || true' EXIT
+
+          ready=000
+          i=0
+          while [ "$i" -lt 30 ]; do
+            ready=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:25700/health/ready || true)
+            if [ "$ready" = "200" ]; then break; fi
+            sleep 1
+            i=$((i+1))
+          done
+          echo "GET /health/ready -> $ready"
+          if [ "$ready" != "200" ]; then
+            echo "::error::integration FAILED: health endpoint not ready"
+            exit 1
+          fi
+
+          version_body=$(curl -s http://127.0.0.1:25700/version)
+          echo "GET /version -> $version_body"
+          if ! echo "$version_body" | grep -q '"protocolVersion"'; then
+            echo "::error::integration FAILED: /version missing protocolVersion"
+            exit 1
+          fi
+          echo "integration OK"
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Setup Node (pinned)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build all workspaces (produces apps/web/dist for preview)
+        run: pnpm build
+
+      - name: Two-browser E2E (required — fails if Playwright/spec/server missing)
+        # 不跳过：任何缺失（apps/web、playwright、spec、game-server）都会使本步非零退出，
+        # 进而 required-checks 失败，阻止合并。
+        run: pnpm test:e2e
+
+      - name: Upload E2E screenshots & report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: e2e-screenshots
+          path: |
+            tests/e2e/screenshots/
+            tests/e2e/playwright-report/
+          retention-days: 14
+
+  # 稳定的聚合检查名，供分支保护规则引用。
+  required:
+    name: required-checks
+    runs-on: ubuntu-latest
+    needs: [verify, migration-check, integration, e2e]
+    steps:
+      - name: All M0 required checks passed
+        run: echo "All M0 required checks passed."

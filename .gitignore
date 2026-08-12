@@ -29,3 +29,12 @@ Thumbs.db
 # local Supabase state
 supabase/.branches/
 supabase/.temp/
+
+# agent work memory (not for repository)
+.workbuddy/
+
+# local pnpm store (used by CI cache, not for repository)
+.pnpm-store/
+
+# local temp files
+_tmp_*

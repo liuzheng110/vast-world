@@ -1,0 +1,34 @@
+{
+  "name": "@vastworld/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "VastWorld M0 Web 客户端（React + Vite + Phaser 2.5D）",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@vastworld/game-core": "workspace:*",
+    "@vastworld/protocol": "workspace:*",
+    "colyseus.js": "^0.16.22",
+    "phaser": "^3.90.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vastworld/config": "workspace:*",
+    "@vitejs/plugin-react": "^5.2.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.10"
+  }
+}

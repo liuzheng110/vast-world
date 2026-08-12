@@ -2,14 +2,14 @@
 
 VastWorld 是一个由社区持续扩展的多人在线 2.5D Web 游戏。玩家打开网页、登录账号、进入房间即可游玩；开发者通过 Issue 和 Pull Request 增加玩法。
 
-当前仓库处于 **M0：工程基线规划** 阶段，尚无可运行游戏代码。不要把规划文档描述成已经实现的功能。
+当前仓库处于 **M0：工程基线** 阶段。M0 已落地最小可运行的客户端、服务端、共享协议与 CI 流水线，但尚无登录、房间玩法或战斗等内容。不要把规划文档描述成已经实现的功能。
 
 ## 已确定的产品边界
 
 - 浏览器直接运行，桌面端优先，后续再适配移动端。
 - 固定斜俯视/正交视角，二维权威坐标，分层精灵呈现 2.5D 世界。
 - 首个可玩版本支持账号登录、房间、多人移动、昵称、聊天、断线重连。
-- 首发按每房间 16 名玩家设计，不以“单一无缝 MMO 世界”为目标。
+- 首发按每房间 16 名玩家设计，不以"单一无缝 MMO 世界"为目标。
 - 游戏规则和关键状态由服务端判定，客户端只负责输入、表现与预测。
 - 玩法通过小模块逐步加入；每个改动必须可测试、可关闭、可回滚。
 
@@ -21,11 +21,11 @@ VastWorld 是一个由社区持续扩展的多人在线 2.5D Web 游戏。玩家
 | 实时游戏服务 | Node.js、Colyseus | 房间、权威状态、游戏循环、同步、重连 |
 | 账号与数据 | Supabase Auth、PostgreSQL | 身份、角色资料、存档、迁移、备份 |
 | 共享契约 | TypeScript package、运行时校验 | 消息、内容配置、错误码和版本兼容 |
-| 工程 | pnpm workspace、GitHub Actions、Docker | 一致构建、测试、制品与发布 |
+| 工程 | pnpm workspace、GitHub Actions | 一致构建、测试、制品与发布 |
 
 选择依据和系统边界见 [架构文档](ARCHITECTURE.md)。
 
-## 计划中的仓库结构
+## 仓库结构
 
 ```text
 vast-world/
@@ -35,21 +35,92 @@ vast-world/
 ├─ packages/
 │  ├─ protocol/            # 网络消息、错误码、协议版本
 │  ├─ game-core/           # 可在无渲染环境测试的纯游戏规则
-│  ├─ content/             # 技能、物品、怪物等数据定义
-│  └─ config/              # 共享 TypeScript/ESLint 配置
+│  └─ config/              # 共享 TypeScript/ESLint/Prettier 配置
 ├─ supabase/
 │  ├─ migrations/          # 数据库迁移
-│  └─ seed.sql             # 本地开发数据
+│  └─ tests/               # PGlite 本地迁移/RLS 测试
 ├─ tests/
-│  ├─ e2e/
-│  └─ load/
+│  └─ e2e/                 # Playwright 双客户端端到端测试
 ├─ docs/
+│  └─ adr/                 # 架构决策记录
 ├─ .github/
+│  ├─ workflows/           # CI / release-please / preview / deploy-staging
+│  └─ dependabot.yml
 ├─ AGENTS.md
+├─ ARCHITECTURE.md
+├─ GAME_DESIGN.md
+├─ ROADMAP.md
+├─ RELEASE.md
+├─ CONTRIBUTING.md
 └─ pnpm-workspace.yaml
 ```
 
-目录会在 M0 实现时创建；未进入代码库的目录不代表已完成。
+## 快速开始
+
+### 前置要求
+
+- Node.js ≥ 22（推荐 22.22.3）
+- pnpm ≥ 11（推荐 11.20.0，通过 `corepack enable` 启用）
+- Git
+
+### 安装与运行
+
+```bash
+# 克隆并安装依赖
+git clone <repo-url> vast-world
+cd vast-world
+pnpm install
+
+# 复制环境变量示例（按需修改）
+cp .env.example .env
+
+# 同时启动 Web 开发服务器和游戏服务端
+pnpm dev
+
+# 或分别启动
+pnpm web:dev          # Web 开发服务器（Vite，默认 http://localhost:5173）
+pnpm --filter @vastworld/game-server dev  # 游戏服务端（默认 ws://localhost:2567）
+```
+
+启动后打开 Web 开发服务器地址，客户端会自动连接本地游戏服务端并完成协议握手。页面显示连接状态、协议版本、应用版本和 commit SHA 即代表 M0 连接基线正常。
+
+### 验证与测试
+
+```bash
+pnpm lint             # ESLint 全仓库
+pnpm typecheck        # TypeScript 类型检查（根 + 所有 workspace）
+pnpm -r run test      # 运行所有 workspace 的单元测试（共 73 个）
+pnpm test             # 仅运行根 Vitest（只覆盖 packages/，不含 apps/）
+pnpm build            # 构建所有 workspace 产物
+pnpm format:check     # Prettier 格式检查
+pnpm db:test          # PGlite 本地数据库迁移/RLS 测试
+pnpm test:e2e         # Playwright E2E（需先 pnpm build 并启动服务）
+```
+
+### 环境变量
+
+`.env.example` 列出了所有需要的环境变量。浏览器只可使用 `VITE_` 前缀变量；服务端变量（`DATABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY` 等）不得出现在客户端代码中。
+
+## M0 当前状态
+
+已实现：
+
+- pnpm workspace monorepo：`apps/web`、`apps/game-server`、`packages/protocol`、`packages/game-core`、`packages/config`
+- Colyseus 权威游戏服务端：房间、握手门禁、20Hz tick、聊天广播、健康检查（`/health/live`、`/health/ready`、`/version`、`/metrics`）
+- React + Phaser 客户端：连接状态机、握手流程、协议版本不匹配/连接失败覆盖层、WASD/方向键移动、滚轮缩放
+- 共享协议包：协议版本、消息类型、错误码、运行时校验、速率限制
+- 纯规则游戏核心：移动归一化、AABB 钳制、序列号单调递增、速率限制器
+- CI：lint、typecheck、全 workspace 单元测试（73 个）、build、协议契约检查、迁移检查、集成测试、Playwright E2E 双客户端验证
+- 自动发布：release-please v4 manifest 模式 + 制品构建（web-dist + game-server-dist + checksums + version.json）
+- 数据库：Supabase 迁移 + PGlite 本地测试
+
+尚未实现（M1 范围）：
+
+- 账号登录、昵称、大厅
+- 多人移动互相可见的精灵渲染
+- 聊天 UI
+- 断线重连的完整体验
+- 16 人房间压测
 
 ## 文档入口
 
@@ -62,6 +133,6 @@ vast-world/
 
 ## 当前下一步
 
-完成 [M0 工程基线](ROADMAP.md)：初始化 monorepo、建立最小客户端/服务端、接入本地 Supabase、加入 CI 和首个自动发布流水线。远程 GitHub 仓库、域名、云账号和生产密钥需要项目维护者提供。
+完成 [M1 权威多人垂直切片](ROADMAP.md)：登录、昵称、大厅、16 人房间、一张 2.5D 地图、权威移动、玩家显示、聊天、离开和断线重连。
 
 > 人提出方向，代码通过验证，所有人共同让世界持续成长。

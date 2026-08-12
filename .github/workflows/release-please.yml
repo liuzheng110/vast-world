@@ -1,0 +1,57 @@
+name: Release Please
+
+# RELEASE.md §3.2 / §4 — 合并到 main 后由机器人维护版本 PR（chore(release)），
+# 并在版本 PR 合并后的发布 commit 上创建 GitHub Release；随后（releases_created=true）
+# 通过 workflow_call 调用 release.yml 构建并上传制品（web-dist / game-server-dist /
+# checksums / version.json）到已存在的 Release。
+#
+# release-please-action v4 不再支持 `command: release-pr` / `command: github-release` 输入，
+# 也不输出 `release_id`。默认行为是在同一次 step 中同时维护版本 PR 和创建 GitHub Release
+# （对应底层 Manifest.createReleases + Manifest.createPullRequests）。
+# 如需拆分，使用 `skip-github-release: true` 或 `skip-github-pull-request: true`。
+#
+# 第三方 Action 固定到完整 commit SHA。
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    # 需要写 main 分支并打开/更新 PR，以及创建 GitHub Release。
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      # v4 输出：releases_created（布尔）+ paths_released（JSON 数组）+ 每个 release 的 tag_name 等。
+      # 没有 release_id 输出。
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      paths_released: ${{ steps.release.outputs.paths_released }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Release Please — maintain version PR & create GitHub Release
+        id: release
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071
+        with:
+          # v4 默认同时执行 createReleases 和 createPullRequests；
+          # 不传 command（v4 已移除该输入），也不传 skip-* 以保持原有两步合一的行为。
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  release-artifacts:
+    name: release-artifacts
+    needs: release-please
+    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag_name: ${{ needs.release-please.outputs.tag_name }}

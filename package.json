@@ -2,6 +2,7 @@
   "name": "vastworld",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "VastWorld M0 工程基线：pnpm workspace + 统一 lint/typecheck/test/build",
   "packageManager": "pnpm@11.20.0",
   "engines": {
@@ -12,13 +13,20 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r run typecheck",
     "test": "vitest run",
     "build": "pnpm -r run build",
+    "db:test": "node supabase/tests/run-local.mjs",
     "dev": "pnpm --parallel -r run dev",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "web:dev": "pnpm --filter @vastworld/web dev",
+    "web:build": "pnpm --filter @vastworld/web build",
+    "web:preview": "pnpm --filter @vastworld/web preview",
+    "test:e2e": "playwright test --config tests/e2e/playwright.config.ts"
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
+    "@electric-sql/pglite": "0.5.4",
     "@vastworld/config": "workspace:*",
+    "@playwright/test": "^1.62.1",
     "eslint": "^10.8.0",
     "prettier": "^3.9.6",
     "typescript": "^5.9.3",

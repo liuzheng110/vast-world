@@ -1,0 +1,91 @@
+# VastWorld 本地 Supabase 配置（Supabase CLI）
+#
+# 约束（见 AGENTS.md §2、ARCHITECTURE.md §7）：
+# - 本文件只描述**本地开发环境**，绝不包含任何真实密钥、生产 project ref 或线上地址。
+# - 数据库结构只通过 supabase/migrations 变更，禁止从控制台做无法追踪的结构修改。
+# - staging / production 使用各自独立的 Supabase 项目，不共用本配置。
+#
+# 常用命令：
+#   supabase start              启动本地栈（需要 Docker）
+#   supabase db reset           从空库重放全部迁移并执行 seed.sql
+#   supabase migration new xxx  新建迁移文件
+
+project_id = "vast-world"
+
+[api]
+enabled = true
+port = 54321
+# 只暴露游戏需要的 schema；auth 由 GoTrue 自己管理，不通过 PostgREST 暴露。
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+# 防止客户端一次性拉走整表。
+max_rows = 500
+
+[db]
+port = 54322
+shadow_port = 54320
+# 与 Supabase 云端免费档保持一致，避免本地能跑、线上语法不支持。
+major_version = 17
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[db.seed]
+# seed 只在本地 `supabase db reset` 时执行，不参与任何线上部署。
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+# 本地邮件收件箱：magic link / 确认邮件都落到这里，不会真的发信。
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+# M0 不使用对象存储，头像等资源先用内置 avatar_key 引用打包素材。
+enabled = false
+
+[realtime]
+# 权威状态由 Colyseus 房间下发，不走 Realtime，避免出现第二条同步通道。
+enabled = false
+
+[analytics]
+enabled = false
+
+[edge_runtime]
+enabled = false
+
+[auth]
+enabled = true
+# 本地 Vite 开发服务器地址。
+site_url = "http://127.0.0.1:5173"
+additional_redirect_urls = ["http://127.0.0.1:5173"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+# M0 不开放匿名登录：房间加入必须能映射到稳定的 auth user id。
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+# 本地关闭邮箱确认，方便快速起号；staging/production 必须开启。
+enable_confirmations = false
+secure_password_change = false
+max_frequency = "1s"
+otp_length = 6
+otp_expiry = 3600
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false

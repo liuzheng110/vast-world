@@ -1,6 +1,8 @@
 # VastWorld CI、自动 PR 与发布方案
 
-状态：M0 实施契约。工作流文件尚未创建前，本文件描述目标，不代表自动化已经运行。
+状态：M0 工作流已落地（CI / release-please / release / preview / deploy-staging 占位）。
+本文件同时描述目标与已实现的自动化。**当前阶段明确禁止 Docker 构建、GHCR 推送与容器部署**，
+相关步骤已删除或禁用；制品以 tarball 形式随 GitHub Release 发布。自动化未推送 GitHub，以下状态以代码为准。
 
 ## 1. 原则
 
@@ -18,7 +20,7 @@
 - 禁止 force push 和删除 `main`。
 - 要求 Pull Request、至少 1 名批准、解决全部会话。
 - 要求分支与 `main` 最新，启用 merge queue（仓库计划支持时）。
-- 必需检查：`lint`、`typecheck`、`unit`、`build`、`integration`、`e2e-smoke`、`migration-check`（按路径触发，但聚合检查名稳定）。
+- 必需检查：`lint`、`typecheck`、`unit`、`build`、`integration`、`e2e`、`migration-check`；聚合检查名为 `required-checks`（供分支保护引用）。
 - `staging` 和 `production` 使用 GitHub Environments；production 要人工批准。
 - Actions 默认 `contents: read`，每个 job 仅增加所需权限；第三方 Action 固定到 commit SHA。
 
@@ -40,10 +42,17 @@
 1. 功能 PR 使用 Conventional Commits。
 2. 合并到 `main` 后，机器人维护一个版本 PR，更新 changelog 和版本。
 3. 维护者选择发布窗口并合并版本 PR。
-4. 机器人创建 SemVer tag 和 GitHub Release。
-5. tag 触发制品构建/签名/发布工作流。
+4. 机器人创建 SemVer tag 与 GitHub Release（release-please-action v4 默认行为，同一 step 同时维护版本 PR 和创建 Release；v4 不再支持 `command: release-pr` / `command: github-release` 输入，也不输出 `release_id`）。
+5. 同一工作流在 `releases_created=true` 后通过 `workflow_call` 调用 `release.yml`，构建并上传制品
+   （web-dist / game-server-dist / checksums / version.json）到已存在的 Release（使用 `gh release upload`，
+   不再次 `gh release create`）。**不依赖「GITHUB_TOKEN 创建 tag 再触发 release.yml」的旧模式。**
 
 游戏应用先使用一个统一版本号，避免早期分别版本化 web/server/protocol。`protocolVersion` 独立存在，用于运行时兼容，不等同产品 SemVer。
+
+> 注意：release-please-action v4 已移除 `command` 输入。默认行为是同一 step 同时维护版本 PR 和创建 GitHub Release；
+> 如需拆分，使用 `skip-github-release: true` 或 `skip-github-pull-request: true`。
+> v4 不输出 `release_id`；可用输出包括 `releases_created`、`paths_released`、`tag_name` 等。
+> `.release-please-manifest.json` 是 manifest 配置文件（版本映射），与 action 输入无关。
 
 ### 3.3 自动修复边界
 
@@ -72,28 +81,35 @@ checkout
 - 缓存 pnpm store，不缓存未验证的构建产物。
 - 测试日志不得打印 token、连接字符串或用户数据。
 - fork PR 不获得仓库 secret；需要 secret 的 preview 由维护者批准后运行。
+- **强制门禁**：`apps/web`、Playwright 与 E2E 若存在则必须真正运行并通过；缺失时报错退出（不 warning 后 0）。聚合检查名为 `required-checks`，供分支保护引用。
+- `migration-check` 真实执行 `pnpm db:test`（PGlite 跑迁移/RLS/约束），而非仅检查文件名。
 
 ### `preview.yml` — PR 预览
 
-- Web 由 Cloudflare Pages 创建静态 preview。
+- **必须真实构建 Web 静态产物**（`pnpm --filter @vastworld/web build`），缺失 apps/web 时该步骤失败。
+- 构建产物作为 `preview-web` artifact 上传，供人工/Cloudflare 取用。
+- Cloudflare Pages 部署步骤在 `CLOUDFLARE_API_TOKEN` 缺失时跳过，但**构建不跳过**。
 - 默认连接共享的无生产数据测试服务，或仅运行本地模拟。
 - 涉及服务端/迁移的短生命周期环境在 M2 后评估；M0 不承诺每 PR 一套完整后端。
 - 预览页面显示 PR 编号、commit SHA、API 目标与“非生产”标识。
 
-### `deploy-staging.yml` — 合并 main
+### `deploy-staging.yml` — 手动占位（当前禁用）
 
-- 复用 CI 结论，构建 Web bundle 和 game-server Docker image。
-- 镜像推送到 GHCR，tag 至少包含完整 commit SHA；记录 digest。
-- 先执行向前兼容迁移，再部署服务端，再部署 Web。
-- 运行健康检查、协议握手、登录测试账号、加入房间和双客户端冒烟。
-- 冒烟失败停止流水线并告警，不晋级生产。
+- **当前明确禁止 Docker 构建与 GHCR 推送**，因此本工作流不构建镜像、不推送制品。
+- 仅保留 `workflow_dispatch` 手动触发占位，打印“staging 部署在 M0 阶段禁用”，不假装部署成功。
+- 待维护者提供 Docker/Registry/Staging 环境后，再恢复：构建 Web bundle 与 game-server 镜像、推 GHCR（tag 含完整 SHA + digest）、
+  向前兼容迁移 → 部署服务端 → 部署 Web、运行健康检查/协议握手/登录/双客户端冒烟，冒烟失败停止并告警。
 
-### `release.yml` — 版本 tag
+### `release.yml` — 复用工作流（制品构建，由 release-please 调用）
 
-- 校验 tag 指向已在 staging 通过的 commit/digest。
-- 生成 GitHub Release 附件：Web bundle、server 镜像引用、SBOM、checksums 和变更说明。
-- 生产部署 job 进入受保护 environment，等待维护者批准。
-- 批准后按数据库 → 服务端 → Web 顺序晋级同一制品，完成后运行生产只读冒烟。
+- 作为 `workflow_call` 复用工作流，由 `release-please.yml` 在 `release_created=true` 后调用。
+- **不构建 Docker 镜像、不推 GHCR**；改为打包 tarball 制品：
+  - `web-dist.tar.gz`（来自 apps/web/dist）
+  - `game-server-dist.tar.gz`（apps/game-server/dist 构建产物，esbuild 内联 @vastworld/* 源码，pnpm 预装 node_modules，下载后解压 `node main.js` 即可运行，不需要 npm install / pnpm install / tsx / monorepo 布局）
+  - `checksums.txt`（sha256）
+  - `version.json`（tag / version / commitSha / protocolVersion）
+- 使用 `gh release upload` 把这些制品上传到 release-please 已创建的 GitHub Release（**不再次 `gh release create`**）。
+- 生产晋级（数据库 → 服务端 → Web、只读冒烟）仍由受保护 environment 在维护者批准后执行，不在本工作流内。
 
 ## 5. 环境与密钥
 
@@ -156,3 +172,34 @@ M1 起始使用停机风险较低的滚动/替换部署：
 - 开源或私有许可证选择。
 
 在这些外部条件具备前，可以完成本地工程和 CI 设计，但不能声称已发布到公网。
+
+## 10. 人工配置清单（需维护者在 GitHub 设置完成）
+
+以下动作无法由代码自动完成，需在仓库 **Settings** 中手动配置；工作流已按这些约定编写。
+
+### 10.1 分支保护（Branches → Branch protection rules → main）
+
+- 禁止 force push、禁止删除 `main`。
+- 要求 Pull Request 并入，至少 1 名批准，要求解决全部会话线程。
+- 要求分支与 `main` 最新（可选 merge queue）。
+- **必需状态检查**：勾选聚合检查 `required-checks`（CI 工作流中定义的稳定检查名）。
+  其余单项（verify / migration-check / integration / e2e）作为参考，不必逐一勾选。
+- 不允许 fork PR 绕过（CI 用 `pull_request` 触发，fork PR 无仓库 secret）。
+
+### 10.2 GitHub Environments
+
+- 创建 `staging` 与 `production` 两个 Environment。
+- `production` 必须配置 **Required reviewers**（人工批准），并在 environment 内限定可部署的分支/secret。
+- `staging` 当前未启用真实部署（deploy-staging.yml 为禁用占位），environment 可先建好待后续启用。
+- 各 environment 之间不共享 secret；密钥仅存于 GitHub Environment secret store。
+- 当前工作流未读取任何部署 secret；Cloudflare 部署仅当有 `CLOUDFLARE_API_TOKEN` 时才尝试。
+
+### 10.3 第三方 Action 固定 SHA（已落实）
+
+- 所有 `uses:` 均固定到完整 commit SHA（见各工作流文件顶部注释），不使用浮动 tag/branch。
+- 升级第三方 Action 时同步更新 SHA，并由 Dependabot 的 `github-actions` monthly PR 提议。
+
+### 10.4 明确禁止（当前阶段）
+
+- **禁止 Docker 构建、GHCR 推送、容器部署**。所有相关步骤已从 release.yml / deploy-staging.yml 删除或禁用。
+- 制品以 tarball 形式随 GitHub Release 发布；生产容器化部署待维护者提供 Registry/Staging 后另行设计。
