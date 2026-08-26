@@ -18,17 +18,17 @@
     "@vastworld/game-core": "workspace:*",
     "@vastworld/protocol": "workspace:*",
     "colyseus.js": "^0.16.22",
-    "phaser": "^3.90.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "phaser": "^4.2.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
     "@vastworld/config": "workspace:*",
-    "@vitejs/plugin-react": "^5.2.0",
-    "typescript": "^5.9.3",
-    "vite": "^7.3.6",
-    "vitest": "^4.1.10"
+    "@vitejs/plugin-react": "^6.1.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   }
 }
