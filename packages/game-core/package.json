@@ -25,9 +25,9 @@
     "@vastworld/protocol": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^26.1.2",
+    "@types/node": "^26.4.1",
     "@vastworld/config": "workspace:*",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
   }
 }
